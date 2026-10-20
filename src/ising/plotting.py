@@ -22,15 +22,19 @@ def _size_colors(sizes):
     return {L: cmap(0.1 + 0.75 * i / n) for i, L in enumerate(sizes)}
 
 
-def plot_equilibration(eq, ax=None, title=None):
+def plot_equilibration(eq, ax=None, title=None, legend=True):
     """Hot- and cold-start energy and |magnetization| per spin against sweep."""
     fig, ax = (ax.figure, ax) if ax is not None else plt.subplots(figsize=(7, 4))
     n = eq.hot.n_sites
     sweeps = np.arange(1, len(eq.hot.energy) + 1)
-    ax.plot(sweeps, np.abs(eq.hot.magnetization) / n, color="C0", lw=1, label="|m|, hot start")
-    ax.plot(sweeps, np.abs(eq.cold.magnetization) / n, color="C0", lw=1, ls=":", label="|m|, cold")
-    ax.plot(sweeps, eq.hot.energy / n, color="C3", lw=1, label="e, hot start")
-    ax.plot(sweeps, eq.cold.energy / n, color="C3", lw=1, ls=":", label="e, cold start")
+    for run, style in ((eq.hot, "-"), (eq.cold, ":")):
+        start = "hot" if run is eq.hot else "cold"
+        ax.plot(
+            sweeps, np.abs(run.magnetization) / n, "C0", ls=style, lw=1, label=f"|m|, {start} start"
+        )
+    for run, style in ((eq.hot, "-"), (eq.cold, ":")):
+        start = "hot" if run is eq.hot else "cold"
+        ax.plot(sweeps, run.energy / n, "C3", ls=style, lw=1, label=f"e, {start} start")
     if eq.sweep is not None:
         ax.axvline(eq.sweep, color="0.4", lw=1, label=f"equilibrated ({eq.sweep} sweeps)")
     ax.set_xscale("log")
@@ -38,7 +42,8 @@ def plot_equilibration(eq, ax=None, title=None):
     ax.set_ylabel("per spin")
     ax.set_ylim(-2.1, 1.1)
     ax.set_title(title or f"T = {eq.hot.T:g}, L = {round(n ** (1 / eq.hot.spins.ndim))}")
-    ax.legend(fontsize=8, loc="center right")
+    if legend:
+        ax.legend(fontsize=8, loc="center right")
     return fig
 
 

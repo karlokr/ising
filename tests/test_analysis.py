@@ -42,3 +42,12 @@ def test_thermodynamics_on_constant_series():
     assert obs.heat_capacity.value == 0.0
     assert obs.susceptibility.value == 0.0
     assert obs.binder.value == pytest.approx(2 / 3)
+
+
+def test_errors_flagged_unreliable_for_short_blocks():
+    slow = ar1(0.99, 2_000, 3)  # tau ~ 100, blocks of 100 samples
+    obs = thermodynamics(slow, slow, n_sites=1, T=1.0)
+    assert not obs.errors_reliable
+    assert "warning" in str(obs)
+    fast = np.random.default_rng(4).standard_normal(20_000)
+    assert thermodynamics(fast, fast, n_sites=1, T=1.0).errors_reliable

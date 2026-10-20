@@ -81,6 +81,13 @@ class Observables:
     binder: Estimate  # 1 - <M^4> / (3 <M^2>^2)
     tau_energy: float  # integrated autocorrelation times, in sweeps
     tau_magnetization: float
+    n_blocks: int = 20
+
+    @property
+    def errors_reliable(self):
+        """False if jackknife blocks are shorter than 10 autocorrelation times."""
+        block = self.n_samples // self.n_blocks
+        return block >= 10 * max(self.tau_energy, self.tau_magnetization)
 
     def __str__(self):
         rows = [
@@ -96,6 +103,12 @@ class Observables:
         lines.append(
             f"  tau_int (sweeps) energy {self.tau_energy:.3g}, |M| {self.tau_magnetization:.3g}"
         )
+        if not self.errors_reliable:
+            lines.append(
+                f"  warning: blocks of {self.n_samples // self.n_blocks} sweeps are shorter than"
+                " 10 autocorrelation times, so errors are underestimated;"
+                " run longer or use wolff"
+            )
         return "\n".join(lines)
 
 
@@ -127,4 +140,5 @@ def thermodynamics(energy, magnetization, n_sites, T, n_blocks=20):
         binder=jackknife(binder, m, n_blocks=n_blocks),
         tau_energy=autocorrelation_time(e),
         tau_magnetization=autocorrelation_time(a),
+        n_blocks=n_blocks,
     )

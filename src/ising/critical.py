@@ -21,18 +21,29 @@ def _weighted_polyfit(x, y, yerr, degree):
     return np.polyfit(x, y, degree, w=w)
 
 
-def peak(T, y, yerr=None, n_points=7, n_boot=400, seed=0):
+def peak(T, y, yerr=None, frac=0.9, min_points=5, n_boot=400, seed=0):
     """Location and height of a peak by a quadratic fit around the maximum.
 
-    Errors come from refitting with ``y`` resampled within ``yerr``.
+    The fit uses the contiguous run of points around the maximum with
+    ``y >= frac * max(y)``, widened to at least ``min_points``, so the window
+    scales with the peak width (narrow for large lattices, broad for small
+    ones). Errors come from refitting with ``y`` resampled within ``yerr``.
     Returns ``(T_peak, height)`` as :class:`Estimate` objects.
     """
     T, y = np.asarray(T, float), np.asarray(y, float)
     i = int(np.argmax(y))
-    lo = max(0, min(i - n_points // 2, len(T) - n_points))
-    sl = slice(lo, lo + n_points)
-    Ts, ys = T[sl], y[sl]
-    es = None if yerr is None else np.asarray(yerr, float)[sl]
+    lo, hi = i, i + 1
+    while lo > 0 and y[lo - 1] >= frac * y[i]:
+        lo -= 1
+    while hi < len(y) and y[hi] >= frac * y[i]:
+        hi += 1
+    while hi - lo < min(min_points, len(y)):
+        if lo > 0 and (hi == len(y) or y[lo - 1] >= y[hi]):
+            lo -= 1
+        else:
+            hi += 1
+    Ts, ys = T[lo:hi], y[lo:hi]
+    es = None if yerr is None else np.asarray(yerr, float)[lo:hi]
 
     def vertex(values):
         a, b, c = _weighted_polyfit(Ts, values, es, 2)
@@ -69,29 +80,34 @@ def fit_log_growth(L, height, height_err):
     return _linear_fit(np.log(np.asarray(L, float)), height, height_err)
 
 
-def binder_crossing(T, u_small, u_large, err_small=None, err_large=None, n_points=6, n_boot=400):
+def binder_crossing(T, u_small, u_large, err_small=None, err_large=None, n_points=2, n_boot=400):
     """Temperature where the Binder cumulants of two lattice sizes cross.
 
-    Fits a straight line to the difference over ``n_points`` temperatures
-    around the sign change. Errors from resampling within the given errors.
+    Below Tc the larger lattice has the larger cumulant, above Tc the smaller.
+    Deep in the ordered phase both sit at 2/3 and noise can flip the sign of
+    the difference, so the crossing used is the last change from negative to
+    positive. A straight line is fitted to the difference over ``n_points``
+    temperatures around it; the difference is S-shaped on a scale ~1/L, so
+    keep this small. Errors from resampling within the given errors.
     """
     T = np.asarray(T, float)
     d = np.asarray(u_small, float) - np.asarray(u_large, float)
-    change = np.flatnonzero(np.diff(np.sign(d)) != 0)
+    change = np.flatnonzero((d[:-1] < 0) & (d[1:] >= 0))
     if change.size == 0:
         raise ValueError("Binder cumulants do not cross in this temperature range")
-    i = int(change[0])
+    i = int(change[-1])
     lo = max(0, min(i - n_points // 2 + 1, len(T) - n_points))
     sl = slice(lo, lo + n_points)
+    have_errors = err_small is not None and err_large is not None
+    err = np.hypot(np.asarray(err_small)[sl], np.asarray(err_large)[sl]) if have_errors else None
 
     def root(values):
-        slope, intercept = np.polyfit(T[sl], values, 1)
+        slope, intercept = _weighted_polyfit(T[sl], values, err, 1)
         return -intercept / slope
 
     t0 = root(d[sl])
-    if err_small is None or err_large is None:
+    if not have_errors:
         return Estimate(t0, np.nan)
-    err = np.hypot(np.asarray(err_small)[sl], np.asarray(err_large)[sl])
     rng = np.random.default_rng(0)
     boot = [root(d[sl] + err * rng.standard_normal(len(err))) for _ in range(n_boot)]
     return Estimate(t0, float(np.std(boot)))

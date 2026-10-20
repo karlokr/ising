@@ -122,7 +122,9 @@ def cmd_animate(args):
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(prog="ising", description=__doc__)
+    parser = argparse.ArgumentParser(
+        prog="ising", description="Monte Carlo simulation of the 1D and 2D Ising model."
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="simulate one temperature and print observables")
