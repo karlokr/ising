@@ -24,6 +24,7 @@ length scale, which is the signature of a critical point.
 - [Locating the critical temperature](#locating-the-critical-temperature)
 - [Validation](#validation)
 - [Development](#development)
+- [License](#license)
 
 ## Quick start
 
@@ -368,3 +369,7 @@ src/ising/
 scripts/make_figures.py   every figure in this README
 docs/data/                cached simulation results behind the figures
 ```
+
+## License
+
+[MIT](LICENSE)
